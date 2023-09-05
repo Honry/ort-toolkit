@@ -1,0 +1,177 @@
+<body>
+  <script>
+    'use strict';
+
+    const backend = getParam('backend') || 'webgpu';
+    let device = getParam('device') || 'cpu';
+    const build = getParam('build') || 'self';
+    const model = getParam('model') || 'mobilenetv2-7';
+    const power = getParam('power') || 'default';
+    const runTimes = getParam('runTimes') || 1;
+    const warmupTimes = getParam('warmupTimes') || 1;
+    const task = getParam('task') || 'performance';
+
+    if (backend === 'webgpu') {
+      device = 'gpu';
+    }
+
+    let feeds;
+
+    async function loadScript(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.onload = resolve;
+        script.onerror = reject;
+        script.src = url;
+        if (url.startsWith('http')) {
+          script.crossOrigin = 'anonymous';
+        }
+        document.body.append(script);
+      })
+    }
+
+    function getParam(name) {
+      name = name.replace(/[\[\]]/g, '\\$&');
+      let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)', 'i');
+      let results = regex.exec(window.location.href);
+      if (!results)
+        return null;
+      if (!results[2])
+        return '';
+      return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+
+    async function runTask(backend) {
+      const options = {
+        executionProviders: [
+          {
+            name: backend,
+            deviceType: device,
+            powerPreference: power,
+          },
+        ],
+      };
+      if (task === 'profile') {
+        options.enableProfiling = true;
+      }
+
+      if (backend === 'wasm') {
+        ort.env.wasm.numThreads = 4;
+        ort.env.wasm.simd = true;
+      }
+
+      const session = await ort.InferenceSession.create(`models/${model}.onnx`, options);
+
+      let times = [];
+      let totalTime = 0;
+      let oldConsoleLog = console.log;
+      let profileLog = [];
+
+      for (var i = 0; i < warmupTimes + runTimes; i++) {
+        const startTime = performance.now();
+        if (task === 'profile' && i >= warmupTimes) {
+          //ort.enableProfiling = true;
+          //ort.env.logLevel = 'verbose';
+          //ort.env.debug = true;
+          if (backend === 'webgpu') {
+            ort.env.webgpu.profilingMode = 'default';
+          }
+
+          // override console.log
+          //(function () {
+          //  console.log = function (log) {
+          //    profileLog.push(log);
+          //  };
+          //})();
+        }
+        const results = await session.run(feeds);
+        if (task === 'conformance') {
+          return results['output'].data;
+        }
+        if (i >= warmupTimes) {
+          let elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
+          totalTime += elapsedTime;
+          times.push(elapsedTime);
+          if (task === 'profile') {
+            //ort.enableProfiling = false;
+            //ort.env.logLevel = 'error';
+            if (backend === 'webgpu') {
+              ort.env.webgpu.profilingMode = '';
+            }
+            //console.log = oldConsoleLog;
+            profileLog.push(elapsedTime);
+            return profileLog;
+          }
+        }
+      }
+      let averageTime = (totalTime / runTimes).toFixed(2);
+      return averageTime;
+    }
+
+    function getFeeds(ort, model) {
+      let feeds = {};
+      let inputs = models[model];
+      for (let key in inputs) {
+        let value = inputs[key];
+        feeds[key] = getTensor(value[0], value[1], value[2]);
+      }
+      return feeds;
+    }
+
+    function getTensor(dataType, shape, value) {
+      let typedArray;
+      if (dataType === 'uint16') {
+        typedArray = Uint16Array;
+      } else if (dataType === 'float16') {
+        typedArray = Uint16Array;
+      } else if (dataType === 'float32') {
+        typedArray = Float32Array;
+      } else if (dataType === 'int32') {
+        typedArray = Int32Array;
+      } else if (dataType === 'int64') {
+        typedArray = BigInt64Array;
+      }
+
+      let data;
+      if (Array.isArray(value)) {
+        data = value;
+      } else {
+        let size = 1;
+        shape.forEach((element) => {
+          size *= element;
+        });
+        data = typedArray.from({ length: size }, () => value);
+      }
+      return new ort.Tensor(dataType, data, shape);
+    }
+
+    async function main() {
+      let urls;
+      if (build === 'ort') {
+        urls = ['https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.webgpu.min.js'];
+      } else {
+        urls = ['../../onnxruntimewebgpu/onnxruntime/js/web/dist/ort.webgpu.min.js'];
+      }
+      urls.push('models.js');
+      for (let url of urls) {
+        await loadScript(url);
+      }
+
+      feeds = getFeeds(ort, model);
+
+      if (task === 'conformance') {
+        let backendOutput = await runTask(backend);
+        let cpuOutput = await runTask('cpu');
+        console.log(compare(backendOutput, cpuOutput));
+      } else if (task === 'performance') {
+        let output = await runTask(backend);
+        console.log(output);
+      } else if (task === 'profile') {
+        let output = await runTask(backend);
+        console.log(output);
+      }
+    }
+
+    main();
+  </script>
+</body>
