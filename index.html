@@ -1,4 +1,6 @@
 <body>
+  <link href="sortable.min.css" rel="stylesheet" />
+  <script src="sortable.min.js"></script>
   <script>
     'use strict';
 
@@ -14,8 +16,8 @@
     if (backend === 'webgpu') {
       device = 'gpu';
     }
-
     let feeds;
+    let profileInfo = [];
 
     async function loadScript(url) {
       return new Promise((resolve, reject) => {
@@ -30,6 +32,16 @@
       })
     }
 
+    function getFeeds(ort, model) {
+      let feeds = {};
+      let inputs = models[model];
+      for (let key in inputs) {
+        let value = inputs[key];
+        feeds[key] = getTensor(value[0], value[1], value[2]);
+      }
+      return feeds;
+    }
+
     function getParam(name) {
       name = name.replace(/[\[\]]/g, '\\$&');
       let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)', 'i');
@@ -39,83 +51,6 @@
       if (!results[2])
         return '';
       return decodeURIComponent(results[2].replace(/\+/g, ' '));
-    }
-
-    async function runTask(backend) {
-      const options = {
-        executionProviders: [
-          {
-            name: backend,
-            deviceType: device,
-            powerPreference: power,
-          },
-        ],
-      };
-      if (task === 'profile') {
-        options.enableProfiling = true;
-      }
-
-      if (backend === 'wasm') {
-        ort.env.wasm.numThreads = 4;
-        ort.env.wasm.simd = true;
-      }
-
-      const session = await ort.InferenceSession.create(`models/${model}.onnx`, options);
-
-      let times = [];
-      let totalTime = 0;
-      let oldConsoleLog = console.log;
-      let profileLog = [];
-
-      for (var i = 0; i < warmupTimes + runTimes; i++) {
-        const startTime = performance.now();
-        if (task === 'profile' && i >= warmupTimes) {
-          //ort.enableProfiling = true;
-          //ort.env.logLevel = 'verbose';
-          //ort.env.debug = true;
-          if (backend === 'webgpu') {
-            ort.env.webgpu.profilingMode = 'default';
-          }
-
-          // override console.log
-          //(function () {
-          //  console.log = function (log) {
-          //    profileLog.push(log);
-          //  };
-          //})();
-        }
-        const results = await session.run(feeds);
-        if (task === 'conformance') {
-          return results['output'].data;
-        }
-        if (i >= warmupTimes) {
-          let elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
-          totalTime += elapsedTime;
-          times.push(elapsedTime);
-          if (task === 'profile') {
-            //ort.enableProfiling = false;
-            //ort.env.logLevel = 'error';
-            if (backend === 'webgpu') {
-              ort.env.webgpu.profilingMode = '';
-            }
-            //console.log = oldConsoleLog;
-            profileLog.push(elapsedTime);
-            return profileLog;
-          }
-        }
-      }
-      let averageTime = (totalTime / runTimes).toFixed(2);
-      return averageTime;
-    }
-
-    function getFeeds(ort, model) {
-      let feeds = {};
-      let inputs = models[model];
-      for (let key in inputs) {
-        let value = inputs[key];
-        feeds[key] = getTensor(value[0], value[1], value[2]);
-      }
-      return feeds;
     }
 
     function getTensor(dataType, shape, value) {
@@ -145,6 +80,109 @@
       return new ort.Tensor(dataType, data, shape);
     }
 
+    function processProfile(log) {
+      //const results = /\[profiling\] kernel \"\d+\|\[(\w+)\] \d+\" (input \w+), execution time: \d+ ns/.exec(log);
+      const results = /\[profiling\] kernel \".*\[(.*)\].*\" (input.*), execution time\: (\d+) ns/.exec(log);
+      profileInfo.push([results[1], results[3], results[2]]);
+    }
+
+    function renderProfile() {
+      let row, th, td;
+
+      // table
+      let table = document.createElement('table');
+      table.className = 'sortable';
+      table.align = 'center';
+      table.style.width = '80%';
+      table.setAttribute('border', '1');
+      document.body.appendChild(table);
+
+      let header = table.createTHead('thead');
+      row = header.insertRow(0);
+      row.style.fontWeight = 'bold';
+      th = document.createElement('th');
+      th.innerHTML = 'Kernel';
+      row.appendChild(th);
+      th = document.createElement('th');
+      th.innerHTML = 'Time (ns)';
+      row.appendChild(th);
+      th = document.createElement('th');
+      th.innerHTML = 'Shape';
+      row.appendChild(th);
+
+      let tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      // rest of line
+      for (let i = 0; i < profileInfo.length; ++i) {
+        let info = profileInfo[i];
+        row = tbody.insertRow(i);
+        for (let j = 0; j < 3; j++) {
+          td = row.insertCell(j);
+          td.innerHTML = info[j];
+        }
+      }
+    }
+
+    async function runTask(backend) {
+      let times = [];
+      let totalTime = 0;
+      let oldConsoleLog = console.log;
+
+      const option = {
+        executionProviders: [
+          {
+            name: backend,
+            deviceType: device,
+            powerPreference: power,
+          },
+        ],
+      };
+
+      if (task === 'profile') {
+        //ort.env.logLevel = 'verbose';
+        //option.enableProfiling = true;
+      }
+
+      if (backend === 'wasm') {
+        ort.env.wasm.numThreads = 4;
+        ort.env.wasm.simd = true;
+      }
+
+      const session = await ort.InferenceSession.create(`models/${model}.onnx`, option);
+
+      for (var i = 0; i < warmupTimes + runTimes; i++) {
+        const startTime = performance.now();
+        if (task === 'profile' && i >= warmupTimes) {
+          if (backend === 'webgpu') {
+            ort.env.webgpu.profilingMode = 'default';
+          }
+
+          // override console.log
+          console.log = function (log) {
+            processProfile(log);
+          };
+        }
+        const results = await session.run(feeds);
+        if (task === 'conformance') {
+          return results['output'].data;
+        }
+        if (i >= warmupTimes) {
+          let elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
+          totalTime += elapsedTime;
+          times.push(elapsedTime);
+          if (task === 'profile') {
+            if (backend === 'webgpu') {
+              ort.env.webgpu.profilingMode = '';
+            }
+            console.log = oldConsoleLog;
+            return elapsedTime;
+          }
+        }
+      }
+      let averageTime = (totalTime / runTimes).toFixed(2);
+      return averageTime;
+    }
+
     async function main() {
       let urls;
       if (build === 'ort') {
@@ -168,6 +206,7 @@
         console.log(output);
       } else if (task === 'profile') {
         let output = await runTask(backend);
+        renderProfile();
         console.log(output);
       }
     }
