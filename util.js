@@ -1,3 +1,18 @@
+
+function getSum(data) {
+  return data.reduce((accumulator, currentValue) => {
+    return accumulator + currentValue
+  }, 0);
+}
+
+function toggleClass(el, className) {
+  if (el.className.indexOf(className) >= 0) {
+    el.className = el.className.replace(className, '');
+  } else {
+    el.className += className;
+  }
+}
+
 function compare(actual, expected, epsilon = 1e-3) {
   try {
     areCloseObjects(actual, expected, epsilon);
