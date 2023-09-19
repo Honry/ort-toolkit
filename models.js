@@ -1,31 +1,18 @@
 const models = {
-  'candy-8': {
-    'input1': ['float32', [1, 3, 224, 224], 0.5],
-  },
+  'candy-8': { 'input1': ['float32', [1, 3, 224, 224], 0.5] },
+  'densenet-9': { 'data_0': ['float32', [1, 3, 224, 224], 0.5] },
+  'efficientnet-lite4-11': { 'images:0': ['float32', [1, 224, 224, 3], 0.5] },
+  'mobilenetv2-7': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
+  'mobilenetv2-10': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
+  'mobilenetv2-12': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
 
-  'densenet-9': {
-    'data_0': ['float32', [1, 3, 224, 224], 0.5],
-  },
-
-  'efficientnet-lite4-11': {
-    'images:0': ['float32', [1, 224, 224, 3], 0.5],
-  },
-
-  'emotion-ferplus-8': {
-    'Input3': ['float32', [1, 1, 64, 64], 0.5],
-  },
+  // todo
+  'emotion-ferplus-8': { 'Input3': ['float32', [1, 1, 64, 64], 0.5] },
 
   'inception-v1-12': {
     'data_0': ['float32', [1, 3, 224, 224], 0.5],
   },
 
-  'mobilenetv2-7': {
-    'input': ['float32', [1, 3, 224, 224], 0.5],
-  },
-
-  'mobilenetv2-10': {
-    'input': ['float32', [1, 3, 224, 224], 0.5],
-  },
 
   'resnet50-v1-12': {
     'data': ['float32', [1, 3, 224, 224], 0.5],
@@ -79,4 +66,42 @@ const models = {
     'A': ['float32', [5], 1],
     'B': ['float32', [5], 1],
   }
+}
+
+function getFeeds(model) {
+  let feeds = {};
+  let inputs = models[model];
+  for (let key in inputs) {
+    let value = inputs[key];
+    feeds[key] = getTensor(value[0], value[1], value[2]);
+  }
+  return feeds;
+}
+
+
+function getTensor(dataType, shape, value) {
+  let typedArray;
+  if (dataType === 'uint16') {
+    typedArray = Uint16Array;
+  } else if (dataType === 'float16') {
+    typedArray = Uint16Array;
+  } else if (dataType === 'float32') {
+    typedArray = Float32Array;
+  } else if (dataType === 'int32') {
+    typedArray = Int32Array;
+  } else if (dataType === 'int64') {
+    typedArray = BigInt64Array;
+  }
+
+  let data;
+  if (Array.isArray(value)) {
+    data = value;
+  } else {
+    let size = 1;
+    shape.forEach((element) => {
+      size *= element;
+    });
+    data = typedArray.from({ length: size }, () => value);
+  }
+  return new ort.Tensor(dataType, data, shape);
 }

@@ -1,3 +1,6 @@
+function reportStatus(status) {
+  document.getElementById('status').innerHTML = status;
+}
 
 function getSum(data) {
   return data.reduce((accumulator, currentValue) => {

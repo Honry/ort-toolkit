@@ -1,16 +1,22 @@
 <body>
   <h1 align='center'>ONNX Runtime Toolkit</h1>
+  <h2 align='center' id='status'></h2>
   <text>
     <b>Usage</b>
     <p>
-      Some parameters are supported in url, and you may use them as 'index.html?key0=value0&key1=value1'. Supported parameters are:
+      Some parameters are supported in url, and you may use them as 'index.html?key0=value0&key1=value1...'. Supported
+      parameters are:
     <p>
-      1) warmupTimes: Warmup times, and their results are not included
+      1) warmupTimes: Warmup times
     <p>
       2) runTimes: Run times
     <p>
-      3) tasks=[task0,task1,task2]: tasks to run, split by ',', while candidates are 'conformance', 'performance', 'ortProfiling', 'webgpuProfiling'.
+      3) tasks=[task0,task1,task2]: tasks to run, split by ','. Candidates are 'conformance', 'performance',
+      'ortProfiling', 'webgpuProfiling'.
     <p>
+      4) ortUrl: ort url. Example: ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime
+    <p>
+    <b>Test Results</b>
   </text>
   <link href="sortable.min.css" rel="stylesheet" />
   <script src="sortable.min.js"></script>
@@ -24,18 +30,17 @@
 
     const backend = getParam('backend') || 'webgpu';
     let device = getParam('device') || 'cpu';
-    const build = getParam('build') || 'self';
-    const model = getParam('model') || 'mobilenetv2-7';
+    const model = getParam('model') || 'mobilenetv2-12';
 
     const power = getParam('power') || 'default';
-    const runTimes = getParam('runTimes') || 2;
-    const warmupTimes = getParam('warmupTimes') || 30;
-    const tasks = getParam('tasks') || 'performance';
+    const runTimes = parseInt(getParam('runTimes')) || 3;
+    const warmupTimes = parseInt(getParam('warmupTimes')) || 10;
+    const tasks = getParam('tasks') || 'webgpuProfiling';
     const wasmThreads = parseInt(getParam('wasmThreads')) || 4;
 
     // for developers
     const keepConsole = getParam('keepConsole') === 'true' || false;
-    const ortDir = getParam('ortDir') || 'onnxruntimewebgpu';
+    const ortUrl = getParam('ortUrl');
     const verbose = getParam('verbose') === 'true' || false;
 
     if (backend === 'webgpu') {
@@ -47,14 +52,15 @@
     let webgpuProfilingData = [];
     let webgpuProfilingIndex = 0;
     let warmupTimesLeft = warmupTimes;
-    let displayPrecision = 2;
+    const displayPrecision = 2;
+    const unitConversionFactor = 1000000;
 
     async function main() {
       let urls;
-      if (build === 'ort') {
-        urls = ['https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/ort.webgpu.min.js'];
+      if (ortUrl) {
+        urls = [`${ortUrl}/js/web/dist/ort.webgpu.min.js`];
       } else {
-        urls = [`../../${ortDir}/onnxruntime/js/web/dist/ort.webgpu.min.js`];
+        urls = ['https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/ort.webgpu.min.js'];
       }
       urls = urls.concat(['models.js', 'util.js']);
       for (let url of urls) {
@@ -67,11 +73,12 @@
         if (task === 'conformance') {
           let backendOutput = await runTask('conformance', backend);
           let cpuOutput = await runTask('conformance', 'cpu');
-          renderTask(task, compare(backendOutput, cpuOutput));
+          renderTask(task, [backendOutput, cpuOutput]);
         } else {
           let times = await runTask(task, backend);
           renderTask(task, times);
         }
+        reportStatus(`Finished task ${task}`);
       }
     }
 
@@ -98,7 +105,7 @@
         ort.env.wasm.simd = true;
       }
 
-      if (!keepConsole) {
+      if (!keepConsole && task.endsWith('Profiling')) {
         oldConsoleLog = console.log;
         console.log = function (log) {
           processConsole(log);
@@ -109,7 +116,8 @@
         session = await ort.InferenceSession.create(`models/${model}.onnx`, option);
       }
 
-      for (var i = 0; i < warmupTimes + runTimes; i++) {
+      for (let i = 0; i < warmupTimes + runTimes; i++) {
+        reportStatus(`Running task ${task} ${i} ...`);
         if (i === warmupTimes && task === 'ortProfiling') {
           option.enableProfiling = true;
         }
@@ -125,7 +133,7 @@
         const startTime = performance.now();
         const results = await session.run(feeds);
         if (task === 'conformance') {
-          let result = results['output'].cpuData;
+          let result = results[session.outputNames[0]]['data'];
           return result;
         }
         if (i >= warmupTimes) {
@@ -144,11 +152,35 @@
         }
       }
 
-      if (!keepConsole) {
+      if (!keepConsole && task.endsWith('Profiling')) {
         console.log = oldConsoleLog;
       }
 
       return times;
+    }
+
+    function getParam(name) {
+      name = name.replace(/[\[\]]/g, '\\$&');
+      let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)', 'i');
+      let results = regex.exec(window.location.href);
+      if (!results)
+        return null;
+      if (!results[2])
+        return '';
+      return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+
+    async function loadScript(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.onload = resolve;
+        script.onerror = reject;
+        script.src = url;
+        if (url.startsWith('http')) {
+          script.crossOrigin = 'anonymous';
+        }
+        document.body.append(script);
+      })
     }
 
     function renderTask(task, data) {
@@ -156,7 +188,14 @@
       document.body.appendChild(p);
 
       if (task === 'conformance') {
-        p.innerText = `${task}: ${data}`;
+        let result = compare(data[0], data[1]);
+        p.innerText = `${task}: ${result}`;
+        if (!result) {
+          for (let i = 0; i < data.length; i++) {
+            console.log(data[i]);
+          }
+        }
+
         return;
       }
       if (task === 'performance') {
@@ -266,80 +305,19 @@
       document.body.appendChild(document.createElement('p'));
     }
 
-    async function loadScript(url) {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.onload = resolve;
-        script.onerror = reject;
-        script.src = url;
-        if (url.startsWith('http')) {
-          script.crossOrigin = 'anonymous';
-        }
-        document.body.append(script);
-      })
-    }
-
-    function getFeeds(model) {
-      let feeds = {};
-      let inputs = models[model];
-      for (let key in inputs) {
-        let value = inputs[key];
-        feeds[key] = getTensor(value[0], value[1], value[2]);
-      }
-      return feeds;
-    }
-
-    function getParam(name) {
-      name = name.replace(/[\[\]]/g, '\\$&');
-      let regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)', 'i');
-      let results = regex.exec(window.location.href);
-      if (!results)
-        return null;
-      if (!results[2])
-        return '';
-      return decodeURIComponent(results[2].replace(/\+/g, ' '));
-    }
-
-    function getTensor(dataType, shape, value) {
-      let typedArray;
-      if (dataType === 'uint16') {
-        typedArray = Uint16Array;
-      } else if (dataType === 'float16') {
-        typedArray = Uint16Array;
-      } else if (dataType === 'float32') {
-        typedArray = Float32Array;
-      } else if (dataType === 'int32') {
-        typedArray = Int32Array;
-      } else if (dataType === 'int64') {
-        typedArray = BigInt64Array;
-      }
-
-      let data;
-      if (Array.isArray(value)) {
-        data = value;
-      } else {
-        let size = 1;
-        shape.forEach((element) => {
-          size *= element;
-        });
-        data = typedArray.from({ length: size }, () => value);
-      }
-      return new ort.Tensor(dataType, data, shape);
-    }
-
-    function processConsole(log) {
+    function processConsole(content) {
       let results;
-      if (log.startsWith('{"cat"')) {
-        let results = JSON.parse(log.replace(/,$/, ''));
+      if (content.startsWith('{"cat"')) {
+        let results = JSON.parse(content.replace(/,$/, ''));
         let args = results['args']
         if ('provider' in args) {
-          let shape = /(\"input_type_shape.*),\"thread_scheduling_stats\"/.exec(log);
-          ortProfilingData.push([ortProfilingIndex++, args['op_name'], parseInt(results['dur']) / 1000000, shape[1], args['provider']]);
+          let shape = /(\"input_type_shape.*),\"thread_scheduling_stats\"/.exec(content);
+          ortProfilingData.push([ortProfilingIndex++, args['op_name'], parseInt(results['dur']) / unitConversionFactor, shape[1], args['provider']]);
         }
-      } else if (log.startsWith('[profiling]')) {
-        results = /\[profiling\] kernel \".*\[(.*)\].*\" (input.*), execution time\: (\d+) ns/.exec(log);
+      } else if (content.startsWith('[profiling]')) {
+        results = /\[profiling\] kernel \".*\[(.*)\].*\" (input.*), execution time\: (\d+) ns/.exec(content);
         if (results) {
-          webgpuProfilingData.push([webgpuProfilingIndex++, results[1], parseInt(results[3]) / 1000000, results[2]]);
+          webgpuProfilingData.push([webgpuProfilingIndex++, results[1], parseInt(results[3]) / unitConversionFactor, results[2]]);
         }
       }
     }
