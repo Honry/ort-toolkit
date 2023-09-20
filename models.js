@@ -5,18 +5,20 @@ const models = {
   'mobilenetv2-7': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
   'mobilenetv2-10': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
   'mobilenetv2-12': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
+  'emotion-ferplus-8': { 'Input3': ['float32', [1, 1, 64, 64], 0.5] },
+  'resnet50-v1-12': { 'data': ['float32', [1, 3, 224, 224], 0.5] },
+  'resnet50-v2-7': { 'data': ['float32', [1, 3, 224, 224], 0.5] },
+  'tinyyolov2-8': { 'image': ['float32', [1, 3, 416, 416], 0.5] },
 
   // todo
-  'emotion-ferplus-8': { 'Input3': ['float32', [1, 1, 64, 64], 0.5] },
+
 
   'inception-v1-12': {
     'data_0': ['float32', [1, 3, 224, 224], 0.5],
   },
 
 
-  'resnet50-v1-12': {
-    'data': ['float32', [1, 3, 224, 224], 0.5],
-  },
+
 
   'segment-anything-vit-h-static-shapes-origin-im-size-initializer-optimized-float32': {
     'image_embeddings': ['float32', [1, 3, 224, 224], 0.5],
@@ -32,9 +34,7 @@ const models = {
 
   // 't5-encoder-12'
 
-  'tinyyolov2-8': {
-    'image': ['float32', [1, 3, 416, 416], 0.5],
-  },
+
 
   'yolo': {
     'image': ['float32', [1, 3, 416, 416], 0.5],

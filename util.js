@@ -111,3 +111,25 @@ function areClosePrimitives(actual, expected, epsilon) {
 function isTypedArray(object) {
   return ArrayBuffer.isView(object) && !(object instanceof DataView);
 }
+
+const type_to_func = {
+  float32: Float32Array,
+  uint16: Uint16Array,
+  float16: Uint16Array,
+  int32: Int32Array,
+  BigInt64Array: BigInt64Array,
+};
+
+function clone(x) {
+  let feed = {};
+  for (const [key, value] of Object.entries(x)) {
+    let func = type_to_func[value.type];
+    let arrayType = func.from(value.data);
+    feed[key] = new ort.Tensor(
+      value.type,
+      arrayType.slice(0),
+      value.dims
+    );
+  }
+  return feed;
+}
