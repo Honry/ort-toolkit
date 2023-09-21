@@ -33,7 +33,7 @@
     const model = getParam('model') || 'mobilenetv2-12';
 
     const power = getParam('power') || 'default';
-    let runTimes = getParam('runTimes') || 2;
+    let runTimes = getParam('runTimes') || 3;
     runTimes = parseInt(runTimes);
     let warmupTimes = getParam('warmupTimes') || 10;
     warmupTimes = parseInt(warmupTimes);
@@ -75,7 +75,7 @@
       for (let task of tasks.split(',')) {
         if (task === 'conformance') {
           let epOutput = await runTask('conformance', ep);
-          let cpuOutput = await runTask('conformance', 'cpu');
+          let cpuOutput = await runTask('conformance', 'wasm');
           renderTask(task, [epOutput, cpuOutput]);
         } else {
           let times = await runTask(task, ep);
@@ -154,7 +154,7 @@
           let result = results[session.outputNames[0]]['data'];
           return result;
         }
-        if (i >= warmupTimes) {
+        if (i === 0 || i >= warmupTimes) {
           const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
           times.push(elapsedTime);
         }
@@ -204,6 +204,7 @@
     function renderTask(task, data) {
       let p = document.createElement('p');
       document.body.appendChild(p);
+      p.innerText = `[${task} results]`;
 
       if (task === 'conformance') {
         let result = compare(data[0], data[1]);
@@ -214,9 +215,24 @@
         return;
       }
       if (task === 'performance') {
+        let details = data.join(', ');
+
+        let result = {};
+        result['first'] = data[0];
+        data.shift();
         let totalTime = getSum(data);
-        let averageTime = (totalTime / data.length).toFixed(2);
-        p.innerText = `${task}: ${averageTime} (${data.join(', ')})`;
+        let averageTime = parseFloat((totalTime / data.length).toFixed(2));
+        result['average'] = averageTime;
+        result['best'] = Math.min(...data);
+
+        p = document.createElement('p');
+        document.body.appendChild(p);
+        p.id = 'result';
+        p.innerText = JSON.stringify(result);
+
+        p = document.createElement('p');
+        document.body.appendChild(p);
+        p.innerText = details;
         return;
       }
 
