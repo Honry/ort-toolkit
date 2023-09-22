@@ -202,41 +202,41 @@
     }
 
     function renderTask(task, data) {
-      let p = document.createElement('p');
-      document.body.appendChild(p);
-      p.innerText = `[${task} results]`;
+      let taskElement = document.createElement('p');
+      document.body.appendChild(taskElement);
+      taskElement.innerText = `[${task} results]`;
+
+      let resultElement = document.createElement('p');
+      document.body.appendChild(resultElement);
+      resultElement.id = 'result';
+      let result = {};
 
       if (task === 'conformance') {
-        let result = compare(data[0], data[1]);
-        p.innerText = `${task}: ${result}`;
+        result['result'] = compare(data[0], data[1]);
+
         for (let i = 0; i < data.length; i++) {
           console.info(data[i]);
         }
-        return;
-      }
-      if (task === 'performance') {
+      } else if (task === 'performance') {
         let details = data.join(', ');
+        let detailsElement = document.createElement('p');
+        document.body.appendChild(detailsElement);
+        detailsElement.innerText = details;
 
-        let result = {};
         result['first'] = data[0];
         data.shift();
         let totalTime = getSum(data);
         let averageTime = parseFloat((totalTime / data.length).toFixed(2));
         result['average'] = averageTime;
         result['best'] = Math.min(...data);
-
-        p = document.createElement('p');
-        document.body.appendChild(p);
-        p.id = 'result';
-        p.innerText = JSON.stringify(result);
-
-        p = document.createElement('p');
-        document.body.appendChild(p);
-        p.innerText = details;
+      }
+      if (task === 'conformance' || task === 'performance') {
+        resultElement.innerText = JSON.stringify(result);
         return;
       }
 
-      p.innerText = `${task}: ${data[0]}ms`;
+      // profiling
+      resultElement.innerText = `${data[0]}ms`;
       if (task === 'ortProfiling') {
         renderProfiling(['Index', 'Kernel', 'Time (ms)', 'Shape', 'Provider'], ortProfilingData);
       }
