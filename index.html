@@ -28,9 +28,10 @@
   <script>
     'use strict';
 
-    const ep = getParam('ep') || 'webnn';
+    const ep = getParam('ep') || 'webgpu';
     let device = getParam('device') || 'gpu';
     const model = getParam('model') || 'mobilenetv2-12';
+    const modelFile = `https://github.com/webatintel/onnx-models/blob/main/${model}.onnx?raw=true`;
 
     const power = getParam('power') || 'default';
     let runTimes = getParam('runTimes') || 3;
@@ -114,7 +115,7 @@
 
       if (task != 'ortProfiling') {
         const startTime = performance.now();
-        session = await ort.InferenceSession.create(`onnx-models/${model}.onnx`, option);
+        session = await ort.InferenceSession.create(modelFile, option);
         const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
         console.info(`${elapsedTime}ms was used to create session`);
       }
@@ -137,7 +138,7 @@
 
         if (task === 'ortProfiling') {
           const startTime = performance.now();
-          session = await ort.InferenceSession.create(`onnx-models/${model}.onnx`, option);
+          session = await ort.InferenceSession.create(modelFile, option);
           const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
           console.info(`${elapsedTime}ms was used to create session`);
         }
