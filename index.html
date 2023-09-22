@@ -16,6 +16,8 @@
     <p>
       4) ortUrl: ort url. Example: ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime
     <p>
+      5) modelLocation=[github|local]. Local models are in onnx-models folder, while github ones are at https://github.com/webatintel/onnx-models.
+      <p>
       <b>Test Results</b>
   </text>
   <link href="sortable.min.css" rel="stylesheet" />
@@ -31,7 +33,13 @@
     const ep = getParam('ep') || 'webgpu';
     let device = getParam('device') || 'gpu';
     const model = getParam('model') || 'mobilenetv2-12';
-    const modelFile = `https://github.com/webatintel/onnx-models/blob/main/${model}.onnx?raw=true`;
+    const modelLocation = getParam('modelLocation') || 'github';
+    let modelPath;
+    if (modelLocation === 'github') {
+      modelPath = `https://github.com/webatintel/onnx-models/blob/main/${model}.onnx?raw=true`;
+    } else {
+      modelPath = `onnx-models/${model}.onnx`;
+    }
 
     const power = getParam('power') || 'default';
     let runTimes = getParam('runTimes') || 3;
@@ -115,7 +123,7 @@
 
       if (task != 'ortProfiling') {
         const startTime = performance.now();
-        session = await ort.InferenceSession.create(modelFile, option);
+        session = await ort.InferenceSession.create(modelPath, option);
         const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
         console.info(`${elapsedTime}ms was used to create session`);
       }
@@ -138,7 +146,7 @@
 
         if (task === 'ortProfiling') {
           const startTime = performance.now();
-          session = await ort.InferenceSession.create(modelFile, option);
+          session = await ort.InferenceSession.create(modelPath, option);
           const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
           console.info(`${elapsedTime}ms was used to create session`);
         }
