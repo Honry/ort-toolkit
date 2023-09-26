@@ -1,14 +1,14 @@
 const models = {
-  'candy-8': { 'input1': ['float32', [1, 3, 224, 224], 0.5] },
-  'densenet-9': { 'data_0': ['float32', [1, 3, 224, 224], 0.5] },
-  'efficientnet-lite4-11': { 'images:0': ['float32', [1, 224, 224, 3], 0.5] },
-  'emotion-ferplus-8': { 'Input3': ['float32', [1, 1, 64, 64], 0.5] },
-  'mobilenetv2-7': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
-  'mobilenetv2-10': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
-  'mobilenetv2-12': { 'input': ['float32', [1, 3, 224, 224], 0.5] },
-  'resnet50-v1-12': { 'data': ['float32', [1, 3, 224, 224], 0.5] },
-  'resnet50-v2-7': { 'data': ['float32', [1, 3, 224, 224], 0.5] },
-  'tinyyolov2-8': { 'image': ['float32', [1, 3, 416, 416], 0.5] },
+  'candy-8': { 'input1': ['float32', [1, 3, 224, 224], 'random'] }, // If the value is set to 0.5, conformance test would fail.
+  'densenet-9': { 'data_0': ['float32', [1, 3, 224, 224], 'random'] },
+  'efficientnet-lite4-11': { 'images:0': ['float32', [1, 224, 224, 3], 'random'] },
+  'emotion-ferplus-8': { 'Input3': ['float32', [1, 1, 64, 64], 'random'] },
+  'mobilenetv2-7': { 'input': ['float32', [1, 3, 224, 224], 'random'] },
+  'mobilenetv2-10': { 'input': ['float32', [1, 3, 224, 224], 'random'] },
+  'mobilenetv2-12': { 'input': ['float32', [1, 3, 224, 224], 'random'] },
+  'resnet50-v1-12': { 'data': ['float32', [1, 3, 224, 224], 'random'] },
+  'resnet50-v2-7': { 'data': ['float32', [1, 3, 224, 224], 'random'] },
+  'tinyyolov2-8': { 'image': ['float32', [1, 3, 416, 416], 'random'] },
 
   // todo
 
@@ -95,13 +95,13 @@ function getTensor(dataType, shape, value) {
 
   let data;
   if (Array.isArray(value)) {
-    data = value;
+    data = value === 'random' ? Math.random() : value;
   } else {
     let size = 1;
     shape.forEach((element) => {
       size *= element;
     });
-    data = typedArray.from({ length: size }, () => value);
+    data = typedArray.from({ length: size }, () => value === 'random' ? Math.random() : value);
   }
   return new ort.Tensor(dataType, data, shape);
 }
