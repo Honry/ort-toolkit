@@ -3,22 +3,22 @@
   <h2 align='center' id='status'></h2>
   <text>
     <b>Usage</b>
-    <p>
-      Some parameters are supported in url, and you may use them as 'index.html?key0=value0&key1=value1...'. Supported
-      parameters are:
-    <p>
-      1) warmupTimes: Warmup times
-    <p>
-      2) runTimes: Run times
-    <p>
-      3) tasks=[task0,task1,task2]: tasks to run, split by ','. Candidates are 'conformance', 'performance',
-      'ortProfiling', 'webgpuProfiling'.
-    <p>
-      4) ortUrl: ort url. Example: ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime
-    <p>
-      5) modelLocation=[github|local]. Local models are in onnx-models folder, while github ones are at https://github.com/webatintel/onnx-models.
-      <p>
-      <b>Test Results</b>
+    <p>You need to start Chrome with "--enable-dawn-features=allow_unsafe_apis" to make webgpuProfiling work.</p>
+    <p>If you meet cross origin issue, you may install Chrome extension "CORS Unblock"
+      (https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino?hl=en) and enable it.</p>
+    <p>Some parameters are supported in url, and you may use them as 'index.html?key0=value0&key1=value1...'. Supported
+      parameters are:</p>
+    <li>ep: execution provider. E.g., webgpu, wasm</li>
+    <li>model: name of model. E.g., mobilenetv2-12</li>
+    <li>modelUrl=[github|server|[url]]. Note that if you provide the url, you may fail to execute the model as the
+      inputs are not defined well.</li>
+    <li>ortUrl: ort url. Example: ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime
+    <li>runTimes: Run times</li>
+    <li>warmupTimes: Warmup times</li>
+    <li>tasks=[task0,task1,task2]: tasks to run, split by ','. Candidates are 'conformance', 'performance',
+      'ortProfiling', 'webgpuProfiling'.</li>
+    <p></p>
+    <b>Test Results</b>
   </text>
   <link href="sortable.min.css" rel="stylesheet" />
   <script src="sortable.min.js"></script>
@@ -33,12 +33,14 @@
     const ep = getParam('ep') || 'webgpu';
     let device = getParam('device') || 'gpu';
     const model = getParam('model') || 'mobilenetv2-12';
-    const modelLocation = getParam('modelLocation') || 'github';
+    const modelUrl = getParam('modelUrl') || 'github';
     let modelPath;
-    if (modelLocation === 'github') {
+    if (modelUrl === 'github') {
       modelPath = `https://github.com/webatintel/onnx-models/blob/main/${model}.onnx?raw=true`;
-    } else {
+    } else if (modelUrl === 'server') {
       modelPath = `onnx-models/${model}.onnx`;
+    } else {
+      modelPath = modelUrl;
     }
 
     const power = getParam('power') || 'default';
