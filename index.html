@@ -67,7 +67,6 @@
     const displayPrecision = 2;
     const unitConversionFactor = 1000000;
     let feeds;
-    let modelBuffer;
 
     async function main() {
       let urls;
@@ -80,9 +79,6 @@
       for (let url of urls) {
         await loadScript(url);
       }
-
-      modelBuffer = await getModelCache(modelName, modelUrl);
-      //console.info(modelBuffer);
 
       for (let task of tasks.split(',')) {
         if (task === 'conformance') {
@@ -100,10 +96,16 @@
     // For ortProfiling, session.endProfiling will dump results of all runs, so we couldn't have a session run multiple times.
     // For webgpuProfiling, layout conversion is done in first run, so we need to collect data of second run.
     async function runTask(task, ep) {
+      let sessionStartTime = performance.now();
       let totalTime = 0;
       let times = [];
       let oldConsoleLog;
       let session;
+
+      const getModelStartTime = performance.now();
+      const modelBuffer = await getModelCache(modelName, modelUrl);
+      const elapsedTime = parseFloat((performance.now() - getModelStartTime).toFixed(2));
+      console.info(`${elapsedTime}ms was used to get model`);
 
       const option = {
         executionProviders: [
@@ -125,13 +127,12 @@
       }
 
       if (task != 'ortProfiling') {
-        const startTime = performance.now();
+        const sessionCreateStartTime = performance.now();
         session = await ort.InferenceSession.create(modelBuffer, option);
         if (feeds === undefined) {
           feeds = getFeeds(session, modelName);
-          console.info(feeds);
         }
-        const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
+        const elapsedTime = parseFloat((performance.now() - sessionCreateStartTime).toFixed(2));
         console.info(`${elapsedTime}ms was used to create session`);
       }
 
@@ -142,6 +143,9 @@
       }
 
       for (let i = 0; i < warmupTimes + runTimes; i++) {
+        if (!sessionStartTime) {
+          sessionStartTime = performance.now();
+        }
         reportStatus(`Running task ${task} ${i} ...`);
         if (i === warmupTimes && task === 'ortProfiling') {
           option.enableProfiling = true;
@@ -152,14 +156,13 @@
         }
 
         if (task === 'ortProfiling') {
-          const startTime = performance.now();
+          const sessionCreateStartTime = performance.now();
           session = await ort.InferenceSession.create(modelBuffer, option);
           feeds = getFeeds(session, modelName);
-          const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
+          const elapsedTime = parseFloat((performance.now() - sessionCreateStartTime).toFixed(2));
           console.info(`${elapsedTime}ms was used to create session`);
         }
 
-        const startTime = performance.now();
         let results;
         if (ep === 'webnn') {
           // Without clone(), you get DOMException: Failed to execute 'postMessage' on 'Worker': ArrayBuffer at index 0 is already detached.
@@ -172,7 +175,8 @@
           return result;
         }
         if (i === 0 || i >= warmupTimes) {
-          const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
+          const elapsedTime = parseFloat((performance.now() - sessionStartTime).toFixed(2));
+          sessionStartTime = null;
           times.push(elapsedTime);
         }
 
