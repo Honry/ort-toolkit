@@ -50,6 +50,7 @@
     warmupTimes = parseInt(warmupTimes);
     const tasks = getParam('tasks') || 'webgpuProfiling';
     const wasmThreads = parseInt(getParam('wasmThreads')) || 4;
+    const layout = getParam('layout') || 'NHWC';
 
     // for developers
     const keepConsole = getParam('keepConsole') === 'true' || false;
@@ -113,6 +114,7 @@
             name: ep,
             deviceType: device,
             powerPreference: power,
+            preferredLayout: layout,
           },
         ],
       };
