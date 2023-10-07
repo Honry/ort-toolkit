@@ -4,20 +4,23 @@
   <text>
     <b>Usage</b>
     <p>You need to start Chrome with "--enable-dawn-features=allow_unsafe_apis" to make webgpuProfiling work.</p>
+    <p>OPFS Explorer: https://chrome.google.com/webstore/detail/opfs-explorer/acndjpgkpaclldomagafnognkcgjignd</p>
     <p>If you meet cross origin issue, you may install Chrome extension "CORS Unblock"
       (https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino?hl=en) and enable it.</p>
     <p>Some parameters are supported in url, and you may use them as 'index.html?key0=value0&key1=value1...'. Supported
       parameters are:</p>
     <li>ep: execution provider. E.g., webgpu, wasm</li>
-    <li>model: name of model. E.g., mobilenetv2-12</li>
-    <li>modelUrl=[github|server|[url]]. Note that if you provide the url, you may fail to execute the model as the
+    <li>modelName: name of modelName. E.g., mobilenetv2-12</li>
+    <li>modelUrl=[github|server|[url]]. Note that if you provide the url, you may fail to execute the modelName as the
       inputs are not defined well.</li>
     <li>ortUrl: ort url. Example: ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime
     <li>runTimes: Run times</li>
     <li>warmupTimes: Warmup times</li>
     <li>tasks=[task0,task1,task2]: tasks to run, split by ','. Candidates are 'conformance', 'performance',
       'ortProfiling', 'webgpuProfiling'.</li>
-    <li>Example: https://wp-27.sh.intel.com/workspace/project/webatintel/ort-toolkit/?tasks=conformance&model=mobilenetv2-12&ep=webgpu&ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime&warmupTimes=10&runTimes=10</li>
+    <li>Example:
+      https://wp-27.sh.intel.com/workspace/project/webatintel/ort-toolkit/?tasks=conformance&modelName=mobilenetv2-12&ep=webgpu&ortUrl=https://wp-27.sh.intel.com/workspace/project/onnxruntime&warmupTimes=10&runTimes=10
+    </li>
     <p></p>
     <b>Test Results</b>
   </text>
@@ -33,17 +36,13 @@
 
     const ep = getParam('ep') || 'webgpu';
     let device = getParam('device') || 'gpu';
-    const model = getParam('model') || 'mobilenetv2-12';
-    const modelUrl = getParam('modelUrl') || 'server';
-    let modelPath;
+    const modelName = getParam('modelName') || 'mobilenetv2-12';
+    let modelUrl = getParam('modelUrl') || 'server';
     if (modelUrl === 'github') {
-      modelPath = `https://github.com/webatintel/ort-models/blob/main/${model}.onnx?raw=true`;
+      modelUrl = `https://github.com/webatintel/ort-models/blob/main/${modelName}.onnx?raw=true`;
     } else if (modelUrl === 'server') {
-      modelPath = `ort-models/${model}.onnx`;
-    } else {
-      modelPath = modelUrl;
+      modelUrl = `${window.location.origin}/${window.location.pathname}ort-models/${modelName}.onnx`;
     }
-
     const power = getParam('power') || 'default';
     let runTimes = getParam('runTimes') || 3;
     runTimes = parseInt(runTimes);
@@ -68,6 +67,7 @@
     const displayPrecision = 2;
     const unitConversionFactor = 1000000;
     let feeds;
+    let modelBuffer;
 
     async function main() {
       let urls;
@@ -80,6 +80,9 @@
       for (let url of urls) {
         await loadScript(url);
       }
+
+      modelBuffer = await getModelCache(modelName, modelUrl);
+      //console.info(modelBuffer);
 
       for (let task of tasks.split(',')) {
         if (task === 'conformance') {
@@ -123,9 +126,9 @@
 
       if (task != 'ortProfiling') {
         const startTime = performance.now();
-        session = await ort.InferenceSession.create(modelPath, option);
+        session = await ort.InferenceSession.create(modelBuffer, option);
         if (feeds === undefined) {
-          feeds = getFeeds(session, model);
+          feeds = getFeeds(session, modelName);
           console.info(feeds);
         }
         const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
@@ -150,8 +153,8 @@
 
         if (task === 'ortProfiling') {
           const startTime = performance.now();
-          session = await ort.InferenceSession.create(modelPath, option);
-          feeds = getFeeds(session, model);
+          session = await ort.InferenceSession.create(modelBuffer, option);
+          feeds = getFeeds(session, modelName);
           const elapsedTime = parseFloat((performance.now() - startTime).toFixed(2));
           console.info(`${elapsedTime}ms was used to create session`);
         }

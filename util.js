@@ -1,3 +1,63 @@
+
+// Get model via Origin Private File System
+async function getModelOPFS(name, url) {
+  const root = await navigator.storage.getDirectory();
+  let fileHandle;
+  let buffer;
+  try {
+    fileHandle = await root.getFileHandle(name);
+    const blob = await fileHandle.getFile();
+    buffer = await blob.arrayBuffer();
+  } catch(e) {
+    const response = await fetch(url);
+    buffer = await readResponse(response);
+    fileHandle = await root.getFileHandle(name, {create: true});
+    const writable = await fileHandle.createWritable();
+    await writable.write(buffer);
+    await writable.close();
+  }
+  return buffer;
+}
+
+// Get model via Cache API
+async function getModelCache(name, url) {
+  const cache = await caches.open(name);
+  let response = await cache.match(url);
+  if (!response) {
+    await cache.add(url);
+    response = await cache.match(url);
+  }
+  const buffer = await readResponse(response);
+  return buffer;
+}
+
+async function readResponse(response) {
+  const contentLength = response.headers.get('Content-Length');
+  let total = parseInt(contentLength ?? '0');
+  let buffer = new Uint8Array(total);
+  let loaded = 0;
+
+  const reader = response.body.getReader();
+  async function read() {
+    const { done, value } = await reader.read();
+    if (done) return;
+
+    let newLoaded = loaded + value.length;
+    if (newLoaded > total) {
+      total = newLoaded;
+      let newBuffer = new Uint8Array(total);
+      newBuffer.set(buffer);
+      buffer = newBuffer;
+    }
+    buffer.set(value, loaded);
+    loaded = newLoaded;
+    return read();
+  }
+
+  await read();
+  return buffer;
+}
+
 function reportStatus(status) {
   document.getElementById('status').innerHTML = status;
 }
