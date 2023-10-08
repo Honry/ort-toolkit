@@ -179,9 +179,9 @@
         }
         if (i === 0 || i >= warmupTimes) {
           const elapsedTime = parseFloat((performance.now() - sessionStartTime).toFixed(2));
-          sessionStartTime = null;
           times.push(elapsedTime);
         }
+        sessionStartTime = null;
 
         if (i === warmupTimes && task === 'ortProfiling') {
           session.endProfiling();
