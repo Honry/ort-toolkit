@@ -260,7 +260,7 @@
       }
 
       // profiling
-      resultElement.innerText = `${data[0]}ms`;
+      resultElement.innerText = `${data[data.length - 1]}ms`;
       if (task === 'ortProfiling') {
         renderProfiling(['Index', 'Kernel', 'Time (ms)', 'Shape', 'Provider'], ortProfilingData);
       }
