@@ -1,7 +1,5 @@
 const models = {
-
-  // TODO: NaN
-  'albert-base-v2': 'bert64', // tjs/albert-base-v2/onnx/model.onnx
+  'albert-base-v2': 'bert64', // tjs/albert-base-v2/onnx/model.onnx. TODO: NaN
   'bart-large-cnn-encoder': 'bert64', // tjs/facebook/bart-large-cnn/onnx/encoder_model.onnx
   'bert-base-cased': 'bert64', // tjs/bert-base-cased/onnx/model.onnx
   'bert-base-uncased': 'bert64', // tjs/bert-base-uncased/onnx/model.onnx
@@ -11,10 +9,10 @@ const models = {
   'detr-resnet-50': 'img224', // tjs/facebook/detr-resnet-50/onnx/model.onnx. TODO: conformance fails
   'dino-vitb16': 'img224', // tjs/facebook/dino-vitb16/onnx/model.onnx
   'distilbert-base-uncased': 'bert64', // tjs/distilbert-base-uncased/onnx/model.onnx
-  'distilgpt2': 'llm-decoder', // tjs/gpt2/onnx/decoder_model_merged.onnx
+  'distilgpt2': 'llm-decoder', // tjs/gpt2/onnx/decoder_model_merged.onnx. TODO: NaN
   'efficientnet-lite4-11': { 'images:0': ['float32', 'random', [1, 224, 224, 3]] }, // webnn
   'emotion-ferplus-8': { 'Input3': ['float32', 'random', [1, 1, 64, 64]] }, // webnn
-  'gpt2': 'llm-decoder', // tjs/gpt2/onnx/decoder_model_merged.onnx
+  'gpt2': 'llm-decoder', // tjs/gpt2/onnx/decoder_model_merged.onnx. TODO: NaN
   'sam-h': {
     'image_embeddings': ['float32', 0.5, [1, 3, 224, 224]],
     'point_coords': ['float32', [327.1111, 426.875, 241.77777, 341.5], [1, 2, 2]],
@@ -90,7 +88,7 @@ function getFeeds(session, modelName) {
         feeds['encoder_attention_mask'] = getTensor('int64', 1n, [1, enc_seqlen]);
       }
     }
-    feeds['use_cache_branch'] = getTensor('bool', false, [1]);
+    feeds['use_cache_branch'] = getTensor('bool', false);
     feeds['input_ids'] = getTensor('int64', 99n, [1, seqlen]);
     feeds['encoder_hidden_states'] = getTensor('float32', 1, [1, enc_seqlen, hiddendim]);
   }
@@ -139,7 +137,7 @@ function getFeeds(session, modelName) {
         feeds[v] = getTensor('float32', 1., [1, 12, seqlen, 64]);
       }
     }
-    feeds['use_cache_branch'] = getTensor('bool', false, [1]);
+    feeds['use_cache_branch'] = getTensor('bool', false);
     feeds['input_ids'] = getTensor('int64', 99n, [1, seqlen]);
     feeds['attention_mask'] = getTensor('int64', 1n, [1, seqlen]);
   }
